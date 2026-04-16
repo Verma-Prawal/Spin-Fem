@@ -1,4 +1,4 @@
-# FEM Viewer — Android App Run Instructions
+# Spin-Fem — Android App Run Instructions
 
 ## Project Location
 ```
