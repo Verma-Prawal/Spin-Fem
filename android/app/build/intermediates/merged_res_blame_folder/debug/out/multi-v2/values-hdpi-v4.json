@@ -1,0 +1,20 @@
+{
+    "logs": [
+        {
+            "outputFile": "com.femviewer.app-mergeDebugResources-2:/values-hdpi-v4/values-hdpi-v4.xml",
+            "map": [
+                {
+                    "source": "C:\\Users\\cse21\\.gradle\\caches\\transforms-3\\21412e6d944868c370ac7bf1f583a9bb\\transformed\\appcompat-1.6.1\\res\\values-hdpi-v4\\values-hdpi-v4.xml",
+                    "from": {
+                        "startLines": "2",
+                        "startColumns": "4",
+                        "startOffsets": "55",
+                        "endLines": "6",
+                        "endColumns": "13",
+                        "endOffsets": "327"
+                    }
+                }
+            ]
+        }
+    ]
+}

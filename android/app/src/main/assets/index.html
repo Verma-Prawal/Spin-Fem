@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>FEM Viewer</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #05050a; overflow: hidden; width: 100vw; height: 100vh; }
+    canvas { display: block; }
+
+    #overlay {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(5, 5, 10, 0.9);
+      z-index: 100;
+      color: #e0e0ff;
+      font-family: sans-serif;
+      transition: opacity 0.5s ease;
+    }
+    #overlay.hidden { opacity: 0; pointer-events: none; }
+
+    .spinner {
+      width: 40px; height: 40px;
+      border: 3px solid rgba(120, 100, 255, 0.2);
+      border-top-color: #7864ff;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 20px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #status { font-size: 14px; }
+  </style>
+</head>
+<body>
+
+  <div id="overlay">
+    <div class="spinner"></div>
+    <div id="status">Loading FEM Model...</div>
+  </div>
+
+  <script src="js/three.min.js"></script>
+  <script src="js/GLTFLoader.js"></script>
+
+  <script>
+    (function () {
+      var log = function(m) { console.log("[FEM] " + m); };
+
+      var scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x11111a);
+
+      var camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+      camera.position.set(0, 0, 10);
+
+      var renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      document.body.appendChild(renderer.domElement);
+
+      var ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
+      scene.add(ambientLight);
+      var directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
+      directionalLight.position.set(5, 10, 7.5);
+      scene.add(directionalLight);
+
+      var pivot = new THREE.Group();
+      scene.add(pivot);
+
+      // --- Controls & Interaction ---
+      var isPointerDown = false;
+      var lastPointerX = 0;
+      var lastPointerY = 0;
+      var targetRotationX = 0;
+      var targetRotationY = 0;
+      var currentRotationX = 0;
+      var currentRotationY = 0;
+      var zoomDistance = 10;
+      var targetZoomDistance = 10;
+
+      // Disable auto-rotation if user interacts
+      var autoRotate = true;
+
+      window.addEventListener('pointerdown', function (e) {
+        isPointerDown = true;
+        lastPointerX = e.clientX;
+        lastPointerY = e.clientY;
+        autoRotate = false;
+      });
+
+      window.addEventListener('pointermove', function (e) {
+        if (!isPointerDown) return;
+        var deltaX = e.clientX - lastPointerX;
+        var deltaY = e.clientY - lastPointerY;
+
+        // Increased sensitivity for high-DPI touch/mouse
+        targetRotationY += deltaX * 0.08;
+        targetRotationX += deltaY * 0.08;
+
+        // Clamp vertical rotation to avoid flipping
+        targetRotationX = Math.max(-Math.PI/2, Math.min(Math.PI/2, targetRotationX));
+
+        lastPointerX = e.clientX;
+        lastPointerY = e.clientY;
+      });
+
+      window.addEventListener('pointerup', function () {
+        isPointerDown = false;
+      });
+
+      window.addEventListener('wheel', function (e) {
+        targetZoomDistance += e.deltaY * 0.01;
+        targetZoomDistance = Math.max(2, Math.min(20, targetZoomDistance));
+      }, { passive: false });
+
+      // Pinch to zoom support
+      var initialPinchDist = 0;
+      window.addEventListener('touchstart', function(e) {
+        if (e.touches.length === 2) {
+          initialPinchDist = Math.hypot(
+            e.touches[0].pageX - e.touches[1].pageX,
+            e.touches[0].pageY - e.touches[1].pageY
+          );
+        }
+      }, { passive: false });
+
+      window.addEventListener('touchmove', function(e) {
+        if (e.touches.length === 2) {
+          var dist = Math.hypot(
+            e.touches[0].pageX - e.touches[1].pageX,
+            e.touches[0].pageY - e.touches[1].pageY
+          );
+          var delta = (initialPinchDist - dist) * 0.05;
+          targetZoomDistance += delta;
+          targetZoomDistance = Math.max(2, Math.min(20, targetZoomDistance));
+          initialPinchDist = dist;
+          e.preventDefault();
+        }
+      }, { passive: false });
+
+      // Animation Loop
+      function animate() {
+        requestAnimationFrame(animate);
+
+        if (autoRotate) {
+          targetRotationY += 0.005;
+        }
+
+        // Adjusted damping for buttery smooth motion
+        currentRotationX += (targetRotationX - currentRotationX) * 0.15;
+        currentRotationY += (targetRotationY - currentRotationY) * 0.15;
+        zoomDistance += (targetZoomDistance - zoomDistance) * 0.15;
+
+        pivot.rotation.x = currentRotationX;
+        pivot.rotation.y = currentRotationY;
+        camera.position.z = zoomDistance;
+
+        renderer.render(scene, camera);
+
+        if (Math.random() < 0.01) {
+           var info = renderer.info.render;
+           if (info.triangles > 0) console.log("[STATS] Tris: " + info.triangles);
+        }
+      }
+      animate();
+
+      var MODEL_URL = 'http://10.0.2.2:8080/models/fem.glb';
+      log("Loading: " + MODEL_URL);
+
+      var loader = new THREE.GLTFLoader();
+      loader.load(
+        MODEL_URL,
+        function (gltf) {
+          log("Model loaded successfully.");
+          var model = gltf.scene;
+
+          // 1. Center and Scale
+          var box = new THREE.Box3().setFromObject(model);
+          var center = box.getCenter(new THREE.Vector3());
+          var size = box.getSize(new THREE.Vector3());
+          var maxDim = Math.max(size.x, size.y, size.z) || 1;
+          var scale = 6.0 / maxDim;
+
+          model.scale.setScalar(scale);
+          model.position.copy(center).multiplyScalar(-scale);
+
+          pivot.add(model);
+
+          // 2. Material Override (Normal material is best for testing geometry)
+          model.traverse(function (node) {
+            if (node.isMesh) {
+              log("Mesh found: " + node.name + " (" + node.geometry.attributes.position.count + " verts)");
+              node.material = new THREE.MeshNormalMaterial({ side: THREE.DoubleSide });
+
+              // Also add points just in case the mesh has issues
+              var pts = new THREE.Points(node.geometry, new THREE.PointsMaterial({
+                color: 0xffffff,
+                size: 2,
+                sizeAttenuation: false
+              }));
+              node.add(pts);
+            }
+          });
+
+          // 3. Helpers
+          scene.add(new THREE.BoxHelper(pivot, 0xffff00));
+
+          document.getElementById('overlay').classList.add('hidden');
+        },
+        function (xhr) {
+          if (xhr.lengthComputable) {
+            var pct = Math.round((xhr.loaded / xhr.total) * 100);
+            document.getElementById('status').textContent = 'Loading... ' + pct + '%';
+          }
+        },
+        function (err) {
+          log("Load Error: " + err);
+          document.getElementById('status').textContent = 'Error loading model.';
+        }
+      );
+
+      window.addEventListener('resize', function () {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+
+    })();
+  </script>
+</body>
+</html>
