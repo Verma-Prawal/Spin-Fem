@@ -158,15 +158,4 @@ var MODEL_URL = 'http://192.168.x.x:8080/models/fem.glb';
 ```
 Then also open port 8080 in Windows Firewall if prompted.
 
----
 
-## Definition of Done Checklist
-
-- [ ] `fem.glb` placed in `backend/src/main/resources/static/models/`
-- [ ] Spring Boot runs on port 8080 without errors
-- [ ] `http://localhost:8080/models/fem.glb` is downloadable in browser
-- [ ] Android app builds and installs in emulator
-- [ ] WebView loads `index.html`
-- [ ] Loading spinner appears then disappears
-- [ ] 3D model is visible and rotating on screen
-- [ ] No crash in Android Studio logcat
